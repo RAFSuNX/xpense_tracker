@@ -16,6 +16,7 @@ interface Expense {
 }
 
 const currencySymbols: { [key: string]: string } = {
+  'BDT': 'TK',
   'USD': '$',
   'EUR': '€',
   'GBP': '£',
