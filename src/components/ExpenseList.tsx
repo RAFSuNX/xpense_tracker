@@ -16,16 +16,16 @@ interface Expense {
 }
 
 const currencySymbols: { [key: string]: string } = {
-  'BDT': 'TK',
-  'USD': '$',
-  'EUR': '€',
-  'GBP': '£',
-  'JPY': '¥',
-  'AUD': 'A$',
-  'CAD': 'C$',
-  'CHF': 'CHF',
-  'CNY': '¥',
-  'INR': '₹'
+  'BDT': 'TK ',
+  'USD': '$ ',
+  'EUR': '€ ',
+  'GBP': '£ ',
+  'JPY': '¥ ',
+  'AUD': 'A$ ',
+  'CAD': 'C$ ',
+  'CHF': 'CHF ',
+  'CNY': '¥ ',
+  'INR': '₹ '
 };
 
 export default function ExpenseList() {
