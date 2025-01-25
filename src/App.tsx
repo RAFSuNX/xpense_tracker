@@ -19,6 +19,11 @@ function Dashboard() {
     }
   }, [darkMode]);
 
+  // Only show dashboard if user is verified
+  if (!user?.emailVerified) {
+    return <AuthForm />;
+  }
+
   return (
     <div className="min-h-screen bg-white dark:bg-black transition-colors">
       <nav className="sticky top-0 z-10 bg-white dark:bg-black border-b border-solid border-black dark:border-white">

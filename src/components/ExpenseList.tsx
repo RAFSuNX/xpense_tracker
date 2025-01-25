@@ -3,14 +3,14 @@ import { collection, onSnapshot, orderBy, query, doc, updateDoc, where } from 'f
 import { db } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
 import { format, subMonths, startOfMonth, endOfMonth, parseISO, endOfDay, startOfDay } from 'date-fns';
-import { ArrowDownCircle, ArrowUpCircle, Download, X, Calendar, Save, Edit2 } from 'lucide-react';
+import { ArrowDownCircle, ArrowUpCircle, Download, X, Calendar, Save, Edit2, ArrowLeftCircle, ArrowRightCircle } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 interface Expense {
   id: string;
   name: string;
   amount: number;
-  type: 'income' | 'expense';
+  type: 'income' | 'expense' | 'payable' | 'receivable';
   notes: string;
   date: string;
 }
@@ -31,7 +31,7 @@ const currencySymbols: { [key: string]: string } = {
 export default function ExpenseList() {
   const { user, userCurrency } = useAuth();
   const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [total, setTotal] = useState({ income: 0, expense: 0 });
+  const [total, setTotal] = useState({ income: 0, expense: 0, payable: 0, receivable: 0 });
   const [selectedPeriod, setSelectedPeriod] = useState('all');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
@@ -105,14 +105,10 @@ export default function ExpenseList() {
 
         const totals = expenseData.reduce(
           (acc, curr) => {
-            if (curr.type === 'income') {
-              acc.income += curr.amount;
-            } else {
-              acc.expense += curr.amount;
-            }
+            acc[curr.type] += curr.amount;
             return acc;
           },
-          { income: 0, expense: 0 }
+          { income: 0, expense: 0, payable: 0, receivable: 0 }
         );
 
         setTotal(totals);
@@ -121,6 +117,34 @@ export default function ExpenseList() {
       return unsubscribe;
     }
   }, [user, selectedPeriod, customStartDate, customEndDate, customStartTime, customEndTime]);
+
+  const getTransactionIcon = (type: string) => {
+    switch (type) {
+      case 'income':
+        return <ArrowUpCircle className="w-6 h-6" />;
+      case 'expense':
+        return <ArrowDownCircle className="w-6 h-6" />;
+      case 'payable':
+        return <ArrowLeftCircle className="w-6 h-6" />;
+      case 'receivable':
+        return <ArrowRightCircle className="w-6 h-6" />;
+      default:
+        return <ArrowDownCircle className="w-6 h-6" />;
+    }
+  };
+
+  const getAmountPrefix = (type: string) => {
+    switch (type) {
+      case 'income':
+      case 'receivable':
+        return '+';
+      case 'expense':
+      case 'payable':
+        return '-';
+      default:
+        return '';
+    }
+  };
 
   const exportToExcel = () => {
     const exportData = expenses.map(expense => ({
@@ -158,7 +182,7 @@ export default function ExpenseList() {
 
   return (
     <div className="space-y-8">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 md:gap-6">
         <div className="group p-6 bg-white dark:bg-black rounded-none shadow-lg border border-solid border-black dark:border-white transition-all hover:bg-black dark:hover:bg-white cursor-pointer">
           <h3 className="text-sm font-medium uppercase tracking-wider mb-1 text-black dark:text-white group-hover:text-white dark:group-hover:text-black transition-colors">Total Income</h3>
           <p className="text-3xl font-bold text-black dark:text-white group-hover:text-white dark:group-hover:text-black transition-colors">{currencySymbol}{total.income.toFixed(2)}</p>
@@ -168,8 +192,12 @@ export default function ExpenseList() {
           <p className="text-3xl font-bold text-black dark:text-white group-hover:text-white dark:group-hover:text-black transition-colors">{currencySymbol}{total.expense.toFixed(2)}</p>
         </div>
         <div className="group p-6 bg-white dark:bg-black rounded-none shadow-lg border border-solid border-black dark:border-white transition-all hover:bg-black dark:hover:bg-white cursor-pointer">
-          <h3 className="text-sm font-medium uppercase tracking-wider mb-1 text-black dark:text-white group-hover:text-white dark:group-hover:text-black transition-colors">Net Balance</h3>
-          <p className="text-3xl font-bold text-black dark:text-white group-hover:text-white dark:group-hover:text-black transition-colors">{currencySymbol}{(total.income - total.expense).toFixed(2)}</p>
+          <h3 className="text-sm font-medium uppercase tracking-wider mb-1 text-black dark:text-white group-hover:text-white dark:group-hover:text-black transition-colors">Total Payable</h3>
+          <p className="text-3xl font-bold text-black dark:text-white group-hover:text-white dark:group-hover:text-black transition-colors">{currencySymbol}{total.payable.toFixed(2)}</p>
+        </div>
+        <div className="group p-6 bg-white dark:bg-black rounded-none shadow-lg border border-solid border-black dark:border-white transition-all hover:bg-black dark:hover:bg-white cursor-pointer">
+          <h3 className="text-sm font-medium uppercase tracking-wider mb-1 text-black dark:text-white group-hover:text-white dark:group-hover:text-black transition-colors">Total Receivable</h3>
+          <p className="text-3xl font-bold text-black dark:text-white group-hover:text-white dark:group-hover:text-black transition-colors">{currencySymbol}{total.receivable.toFixed(2)}</p>
         </div>
       </div>
 
@@ -248,18 +276,12 @@ export default function ExpenseList() {
               <div 
                 key={expense.id} 
                 className="p-6 flex items-center justify-between text-black dark:text-white hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-all group cursor-pointer"
-                onClick={() => setSelectedExpense( expense)}
+                onClick={() => setSelectedExpense(expense)}
               >
                 <div className="flex items-center space-x-4">
-                  {expense.type === 'income' ? (
-                    <div className="w-12 h-12 rounded-none border border-solid border-black dark:border-white group-hover:border-white dark:group-hover:border-black flex items-center justify-center transition-colors">
-                      <ArrowUpCircle className="w-6 h-6" />
-                    </div>
-                  ) : (
-                    <div className="w-12 h-12 rounded-none border border-solid border-black dark:border-white group-hover:border-white dark:group-hover:border-black flex items-center justify-center transition-colors">
-                      <ArrowDownCircle className="w-6 h-6" />
-                    </div>
-                  )}
+                  <div className="w-12 h-12 rounded-none border border-solid border-black dark:border-white group-hover:border-white dark:group-hover:border-black flex items-center justify-center transition-colors">
+                    {getTransactionIcon(expense.type)}
+                  </div>
                   <div>
                     <h3 className="font-bold uppercase tracking-wider">{expense.name}</h3>
                     <p className="text-sm opacity-80">
@@ -272,7 +294,7 @@ export default function ExpenseList() {
                 </div>
                 <div className="text-right">
                   <p className="text-lg font-bold">
-                    {expense.type === 'income' ? '+' : '-'}{currencySymbol}{expense.amount.toFixed(2)}
+                    {getAmountPrefix(expense.type)}{currencySymbol}{expense.amount.toFixed(2)}
                   </p>
                   <p className="text-sm uppercase tracking-wider opacity-80">
                     {expense.type}
@@ -332,11 +354,13 @@ export default function ExpenseList() {
                   </label>
                   <select
                     value={editingExpense.type}
-                    onChange={(e) => setEditingExpense({ ...editingExpense, type: e.target.value as 'income' | 'expense' })}
+                    onChange={(e) => setEditingExpense({ ...editingExpense, type: e.target.value as 'income' | 'expense' | 'payable' | 'receivable' })}
                     className="w-full px-4 py-2 bg-transparent border border-solid border-black dark:border-white text-black dark:text-white rounded-none"
                   >
                     <option value="income">Income</option>
                     <option value="expense">Expense</option>
+                    <option value="payable">Account Payable (Borrowed)</option>
+                    <option value="receivable">Account Receivable (Lent)</option>
                   </select>
                 </div>
                 <div>
@@ -390,7 +414,7 @@ export default function ExpenseList() {
                 <div>
                   <p className="text-sm uppercase tracking-wider text-black dark:text-white opacity-70">Amount</p>
                   <p className="text-black dark:text-white font-bold">
-                    {selectedExpense.type === 'income' ? '+' : '-'}{currencySymbol}{selectedExpense.amount.toFixed(2)}
+                    {getAmountPrefix(selectedExpense.type)}{currencySymbol}{selectedExpense.amount.toFixed(2)}
                   </p>
                 </div>
                 <div>

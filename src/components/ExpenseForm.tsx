@@ -9,7 +9,7 @@ export default function ExpenseForm() {
   const { user } = useAuth();
   const [name, setName] = useState('');
   const [amount, setAmount] = useState('');
-  const [type, setType] = useState<'income' | 'expense'>('expense');
+  const [type, setType] = useState<'income' | 'expense' | 'payable' | 'receivable'>('expense');
   const [notes, setNotes] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -66,11 +66,13 @@ export default function ExpenseForm() {
         <label className="block text-sm font-bold uppercase tracking-wider text-black dark:text-white mb-2">Type</label>
         <select
           value={type}
-          onChange={(e) => setType(e.target.value as 'income' | 'expense')}
+          onChange={(e) => setType(e.target.value as 'income' | 'expense' | 'payable' | 'receivable')}
           className="w-full px-4 py-3 bg-transparent border border-solid border-black dark:border-white text-black dark:text-white rounded-none focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white transition-all uppercase"
         >
           <option value="income">Income</option>
           <option value="expense">Expense</option>
+          <option value="payable">Account Payable (Borrowed)</option>
+          <option value="receivable">Account Receivable (Lent)</option>
         </select>
       </div>
       <div className="mt-8">

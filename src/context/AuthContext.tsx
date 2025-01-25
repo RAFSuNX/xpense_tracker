@@ -4,10 +4,13 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signOut,
-  onAuthStateChanged
+  onAuthStateChanged,
+  sendEmailVerification,
+  sendPasswordResetEmail
 } from 'firebase/auth';
 import { auth, db } from '../lib/firebase';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { toast } from 'react-hot-toast';
 
 interface AuthContextType {
   user: User | null;
@@ -16,6 +19,8 @@ interface AuthContextType {
   signUp: (email: string, password: string, currency: string) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  resendVerificationEmail: () => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({} as AuthContextType);
@@ -52,6 +57,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       createdAt: new Date().toISOString()
     });
     setUserCurrency(currency);
+    
+    // Send verification email
+    await sendEmailVerification(userCredential.user);
+    toast.success('Verification email sent. Please check your inbox.');
   };
 
   const signIn = async (email: string, password: string) => {
@@ -67,8 +76,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUserCurrency(null);
   };
 
+  const resendVerificationEmail = async () => {
+    if (!user) throw new Error('No user logged in');
+    await sendEmailVerification(user);
+    toast.success('Verification email sent. Please check your inbox.');
+  };
+
+  const resetPassword = async (email: string) => {
+    await sendPasswordResetEmail(auth, email);
+    toast.success('Password reset email sent. Please check your inbox.');
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, userCurrency, signUp, signIn, logout }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      loading, 
+      userCurrency, 
+      signUp, 
+      signIn, 
+      logout,
+      resendVerificationEmail,
+      resetPassword
+    }}>
       {!loading && children}
     </AuthContext.Provider>
   );
