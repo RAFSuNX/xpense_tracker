@@ -3,7 +3,7 @@ import { collection, onSnapshot, orderBy, query, doc, updateDoc, where } from 'f
 import { db } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
 import { format, subMonths, startOfMonth, endOfMonth, parseISO, endOfDay, startOfDay } from 'date-fns';
-import { ArrowDownCircle, ArrowUpCircle, Download, X, Calendar, Save, Edit2, ArrowLeftCircle, ArrowRightCircle } from 'lucide-react';
+import { ArrowDownCircle, ArrowUpCircle, Download, X, Calendar, Save, Edit2, ArrowLeftCircle, ArrowRightCircle, Search } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 interface Expense {
@@ -31,6 +31,7 @@ const currencySymbols: { [key: string]: string } = {
 export default function ExpenseList() {
   const { user, userCurrency } = useAuth();
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [filteredExpenses, setFilteredExpenses] = useState<Expense[]>([]);
   const [total, setTotal] = useState({ income: 0, expense: 0, payable: 0, receivable: 0 });
   const [selectedPeriod, setSelectedPeriod] = useState('all');
   const [customStartDate, setCustomStartDate] = useState('');
@@ -39,6 +40,8 @@ export default function ExpenseList() {
   const [customEndTime, setCustomEndTime] = useState('23:59');
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
+  const [showFilters, setShowFilters] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const currencySymbol = currencySymbols[userCurrency || 'USD'];
 
@@ -102,6 +105,7 @@ export default function ExpenseList() {
         })) as Expense[];
 
         setExpenses(expenseData);
+        setFilteredExpenses(expenseData);
 
         const totals = expenseData.reduce(
           (acc, curr) => {
@@ -117,6 +121,22 @@ export default function ExpenseList() {
       return unsubscribe;
     }
   }, [user, selectedPeriod, customStartDate, customEndDate, customStartTime, customEndTime]);
+
+  useEffect(() => {
+    if (searchQuery.trim() === '') {
+      setFilteredExpenses(expenses);
+      return;
+    }
+
+    const query = searchQuery.toLowerCase();
+    const filtered = expenses.filter(expense => 
+      expense.name.toLowerCase().includes(query) ||
+      expense.type.toLowerCase().includes(query) ||
+      expense.notes.toLowerCase().includes(query)
+    );
+
+    setFilteredExpenses(filtered);
+  }, [searchQuery, expenses]);
 
   const getTransactionIcon = (type: string) => {
     switch (type) {
@@ -147,7 +167,7 @@ export default function ExpenseList() {
   };
 
   const exportToExcel = () => {
-    const exportData = expenses.map(expense => ({
+    const exportData = filteredExpenses.map(expense => ({
       Date: format(new Date(expense.date), 'MMM d, yyyy'),
       Name: expense.name,
       Type: expense.type.charAt(0).toUpperCase() + expense.type.slice(1),
@@ -182,33 +202,54 @@ export default function ExpenseList() {
 
   return (
     <div className="space-y-8">
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 md:gap-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
         <div className="group p-6 bg-white dark:bg-black rounded-none shadow-lg border border-solid border-black dark:border-white transition-all hover:bg-black dark:hover:bg-white cursor-pointer">
           <h3 className="text-sm font-medium uppercase tracking-wider mb-1 text-black dark:text-white group-hover:text-white dark:group-hover:text-black transition-colors">Total Income</h3>
-          <p className="text-3xl font-bold text-black dark:text-white group-hover:text-white dark:group-hover:text-black transition-colors">{currencySymbol}{total.income.toFixed(2)}</p>
+          <p className="text-xl md:text-3xl font-bold text-black dark:text-white group-hover:text-white dark:group-hover:text-black transition-colors">{currencySymbol}{total.income.toFixed(2)}</p>
         </div>
         <div className="group p-6 bg-white dark:bg-black rounded-none shadow-lg border border-solid border-black dark:border-white transition-all hover:bg-black dark:hover:bg-white cursor-pointer">
           <h3 className="text-sm font-medium uppercase tracking-wider mb-1 text-black dark:text-white group-hover:text-white dark:group-hover:text-black transition-colors">Total Expenses</h3>
-          <p className="text-3xl font-bold text-black dark:text-white group-hover:text-white dark:group-hover:text-black transition-colors">{currencySymbol}{total.expense.toFixed(2)}</p>
+          <p className="text-xl md:text-3xl font-bold text-black dark:text-white group-hover:text-white dark:group-hover:text-black transition-colors">{currencySymbol}{total.expense.toFixed(2)}</p>
         </div>
         <div className="group p-6 bg-white dark:bg-black rounded-none shadow-lg border border-solid border-black dark:border-white transition-all hover:bg-black dark:hover:bg-white cursor-pointer">
           <h3 className="text-sm font-medium uppercase tracking-wider mb-1 text-black dark:text-white group-hover:text-white dark:group-hover:text-black transition-colors">Total Payable</h3>
-          <p className="text-3xl font-bold text-black dark:text-white group-hover:text-white dark:group-hover:text-black transition-colors">{currencySymbol}{total.payable.toFixed(2)}</p>
+          <p className="text-xl md:text-3xl font-bold text-black dark:text-white group-hover:text-white dark:group-hover:text-black transition-colors">{currencySymbol}{total.payable.toFixed(2)}</p>
         </div>
         <div className="group p-6 bg-white dark:bg-black rounded-none shadow-lg border border-solid border-black dark:border-white transition-all hover:bg-black dark:hover:bg-white cursor-pointer">
           <h3 className="text-sm font-medium uppercase tracking-wider mb-1 text-black dark:text-white group-hover:text-white dark:group-hover:text-black transition-colors">Total Receivable</h3>
-          <p className="text-3xl font-bold text-black dark:text-white group-hover:text-white dark:group-hover:text-black transition-colors">{currencySymbol}{total.receivable.toFixed(2)}</p>
+          <p className="text-xl md:text-3xl font-bold text-black dark:text-white group-hover:text-white dark:group-hover:text-black transition-colors">{currencySymbol}{total.receivable.toFixed(2)}</p>
         </div>
       </div>
 
       <div className="bg-white dark:bg-black rounded-none shadow-lg border border-solid border-black dark:border-white overflow-hidden">
-        <div className="p-6 border-b border-solid border-black dark:border-white flex flex-wrap gap-4 justify-between items-center">
-          <h2 className="text-xl font-bold text-black dark:text-white uppercase tracking-wider">Transaction History</h2>
-          <div className="flex flex-wrap items-center gap-4">
+        <div className="p-4 md:p-6 border-b border-solid border-black dark:border-white">
+          <div className="flex flex-wrap gap-4 justify-between items-center mb-4">
+            <h2 className="text-xl font-bold text-black dark:text-white uppercase tracking-wider">Transaction History</h2>
+            <div className="flex gap-4">
+              <div className="relative flex-1 md:min-w-[300px]">
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search transactions..."
+                  className="w-full pl-10 pr-4 py-2 bg-white dark:bg-black border border-solid border-black dark:border-white text-black dark:text-white rounded-none focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white transition-all placeholder-gray-500 dark:placeholder-gray-400"
+                />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500 dark:text-gray-400" />
+              </div>
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className="md:hidden px-4 py-2 bg-white dark:bg-black border border-solid border-black dark:border-white text-black dark:text-white hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-all uppercase tracking-wider"
+              >
+                {showFilters ? 'Hide Filters' : 'Show Filters'}
+              </button>
+            </div>
+          </div>
+          
+          <div className={`${showFilters ? 'flex' : 'hidden'} md:flex flex-col md:flex-row flex-wrap items-start md:items-center gap-4 w-full`}>
             <select
               value={selectedPeriod}
               onChange={(e) => setSelectedPeriod(e.target.value)}
-              className="px-4 py-2 bg-white dark:bg-black border border-solid border-black dark:border-white text-black dark:text-white rounded-none focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white transition-all uppercase tracking-wider appearance-none cursor-pointer hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black"
+              className="w-full md:w-auto px-4 py-2 bg-white dark:bg-black border border-solid border-black dark:border-white text-black dark:text-white rounded-none focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white transition-all uppercase tracking-wider appearance-none cursor-pointer hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black"
             >
               <option value="all">All Time</option>
               <option value="1">Last Month</option>
@@ -219,38 +260,38 @@ export default function ExpenseList() {
             </select>
             
             {selectedPeriod === 'custom' && (
-              <div className="flex flex-wrap items-center gap-4">
-                <div className="flex flex-col">
+              <div className="flex flex-col md:flex-row items-start md:items-center gap-4 w-full md:w-auto">
+                <div className="flex flex-col w-full md:w-auto">
                   <label className="text-xs font-bold uppercase tracking-wider text-black dark:text-white mb-1">From</label>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 w-full md:w-auto">
                     <input
                       type="date"
                       value={customStartDate}
                       onChange={(e) => setCustomStartDate(e.target.value)}
-                      className="px-4 py-2 bg-white dark:bg-black border border-solid border-black dark:border-white text-black dark:text-white rounded-none focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white transition-all cursor-pointer hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black"
+                      className="flex-1 md:flex-none px-4 py-2 bg-white dark:bg-black border border-solid border-black dark:border-white text-black dark:text-white rounded-none focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white transition-all cursor-pointer hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black"
                     />
                     <input
                       type="time"
                       value={customStartTime}
                       onChange={(e) => setCustomStartTime(e.target.value)}
-                      className="px-4 py-2 bg-white dark:bg-black border border-solid border-black dark:border-white text-black dark:text-white rounded-none focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white transition-all cursor-pointer hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black"
+                      className="w-auto px-4 py-2 bg-white dark:bg-black border border-solid border-black dark:border-white text-black dark:text-white rounded-none focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white transition-all cursor-pointer hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black"
                     />
                   </div>
                 </div>
-                <div className="flex flex-col">
+                <div className="flex flex-col w-full md:w-auto">
                   <label className="text-xs font-bold uppercase tracking-wider text-black dark:text-white mb-1">To</label>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 w-full md:w-auto">
                     <input
                       type="date"
                       value={customEndDate}
                       onChange={(e) => setCustomEndDate(e.target.value)}
-                      className="px-4 py-2 bg-white dark:bg-black border border-solid border-black dark:border-white text-black dark:text-white rounded-none focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white transition-all cursor-pointer hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black"
+                      className="flex-1 md:flex-none px-4 py-2 bg-white dark:bg-black border border-solid border-black dark:border-white text-black dark:text-white rounded-none focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white transition-all cursor-pointer hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black"
                     />
                     <input
                       type="time"
                       value={customEndTime}
                       onChange={(e) => setCustomEndTime(e.target.value)}
-                      className="px-4 py-2 bg-white dark:bg-black border border-solid border-black dark:border-white text-black dark:text-white rounded-none focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white transition-all cursor-pointer hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black"
+                      className="w-auto px-4 py-2 bg-white dark:bg-black border border-solid border-black dark:border-white text-black dark:text-white rounded-none focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white transition-all cursor-pointer hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black"
                     />
                   </div>
                 </div>
@@ -259,7 +300,7 @@ export default function ExpenseList() {
             
             <button
               onClick={exportToExcel}
-              className="px-4 py-2 bg-white dark:bg-black border border-solid border-black dark:border-white text-black dark:text-white hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-all flex items-center gap-2 font-bold uppercase tracking-wider"
+              className="w-full md:w-auto px-4 py-2 bg-white dark:bg-black border border-solid border-black dark:border-white text-black dark:text-white hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-all flex items-center justify-center gap-2 font-bold uppercase tracking-wider"
             >
               <Download className="w-4 h-4" />
               Export
@@ -267,36 +308,36 @@ export default function ExpenseList() {
           </div>
         </div>
         <div className="divide-y divide-solid divide-black dark:divide-white">
-          {expenses.length === 0 ? (
+          {filteredExpenses.length === 0 ? (
             <div className="p-8 text-center text-black dark:text-white">
-              No transactions recorded. Add your first transaction above.
+              {searchQuery ? 'No transactions found matching your search.' : 'No transactions recorded. Add your first transaction above.'}
             </div>
           ) : (
-            expenses.map((expense) => (
+            filteredExpenses.map((expense) => (
               <div 
                 key={expense.id} 
-                className="p-6 flex items-center justify-between text-black dark:text-white hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-all group cursor-pointer"
+                className="p-4 md:p-6 flex items-center justify-between text-black dark:text-white hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-all group cursor-pointer"
                 onClick={() => setSelectedExpense(expense)}
               >
                 <div className="flex items-center space-x-4">
-                  <div className="w-12 h-12 rounded-none border border-solid border-black dark:border-white group-hover:border-white dark:group-hover:border-black flex items-center justify-center transition-colors">
+                  <div className="w-10 h-10 md:w-12 md:h-12 rounded-none border border-solid border-black dark:border-white group-hover:border-white dark:group-hover:border-black flex items-center justify-center transition-colors">
                     {getTransactionIcon(expense.type)}
                   </div>
                   <div>
-                    <h3 className="font-bold uppercase tracking-wider">{expense.name}</h3>
-                    <p className="text-sm opacity-80">
+                    <h3 className="font-bold uppercase tracking-wider text-sm md:text-base">{expense.name}</h3>
+                    <p className="text-xs md:text-sm opacity-80">
                       {format(new Date(expense.date), 'MMM d, yyyy')}
                     </p>
                     {expense.notes && (
-                      <p className="text-sm opacity-80 mt-1">{expense.notes}</p>
+                      <p className="text-xs md:text-sm opacity-80 mt-1 line-clamp-1">{expense.notes}</p>
                     )}
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-lg font-bold">
+                  <p className="text-base md:text-lg font-bold">
                     {getAmountPrefix(expense.type)}{currencySymbol}{expense.amount.toFixed(2)}
                   </p>
-                  <p className="text-sm uppercase tracking-wider opacity-80">
+                  <p className="text-xs md:text-sm uppercase tracking-wider opacity-80">
                     {expense.type}
                   </p>
                 </div>
@@ -308,7 +349,7 @@ export default function ExpenseList() {
 
       {selectedExpense && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white dark:bg-black border border-solid border-black dark:border-white p-6 max-w-lg w-full">
+          <div className="bg-white dark:bg-black border border-solid border-black dark:border-white p-4 md:p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-xl font-bold text-black dark:text-white uppercase tracking-wider">
                 Transaction Details
@@ -374,16 +415,16 @@ export default function ExpenseList() {
                     rows={3}
                   />
                 </div>
-                <div className="flex justify-end gap-4 mt-6">
+                <div className="flex flex-col md:flex-row justify-end gap-4 mt-6">
                   <button
                     onClick={() => setEditingExpense(null)}
-                    className="px-4 py-2 border border-solid border-black dark:border-white text-black dark:text-white hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-all uppercase tracking-wider"
+                    className="w-full md:w-auto px-4 py-2 border border-solid border-black dark:border-white text-black dark:text-white hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-all uppercase tracking-wider"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={handleUpdateExpense}
-                    className="px-4 py-2 bg-black dark:bg-white text-white dark:text-black border border-solid border-black dark:border-white hover:bg-white hover:text-black dark:hover:bg-black dark:hover:text-white transition-all uppercase tracking-wider flex items-center gap-2"
+                    className="w-full md:w-auto px-4 py-2 bg-black dark:bg-white text-white dark:text-black border border-solid border-black dark:border-white hover:bg-white hover:text-black dark:hover:bg-black dark:hover:text-white transition-all uppercase tracking-wider flex items-center justify-center gap-2"
                   >
                     <Save className="w-4 h-4" />
                     Save Changes
@@ -424,7 +465,7 @@ export default function ExpenseList() {
                 {selectedExpense.notes && (
                   <div>
                     <p className="text-sm uppercase tracking-wider text-black dark:text-white opacity-70">Notes</p>
-                    <p className="text-black dark:text-white">{selectedExpense.notes}</p>
+                    <p className="text-black dark:text-white break-words">{selectedExpense.notes}</p>
                   </div>
                 )}
               </div>
