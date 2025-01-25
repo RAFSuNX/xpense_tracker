@@ -21,7 +21,7 @@ function Dashboard() {
 
   return (
     <div className="min-h-screen bg-white dark:bg-black transition-colors">
-      <nav className="sticky top-0 z-10 bg-white dark:bg-black border-b-2 border-black dark:border-white">
+      <nav className="sticky top-0 z-10 bg-white dark:bg-black border-b border-solid border-black dark:border-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-20">
             <div className="flex items-center">
@@ -30,7 +30,7 @@ function Dashboard() {
             <div className="flex items-center space-x-4">
               <button
                 onClick={() => setDarkMode(!darkMode)}
-                className="p-2 border-2 border-black dark:border-white rounded-none text-black dark:text-white hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-all"
+                className="p-2 border border-solid border-black dark:border-white rounded-none text-black dark:text-white hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-all"
                 aria-label="Toggle dark mode"
               >
                 {darkMode ? (
@@ -41,7 +41,7 @@ function Dashboard() {
               </button>
               <button
                 onClick={logout}
-                className="px-6 py-2 border-2 border-black dark:border-white text-black dark:text-white rounded-none hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-all font-bold uppercase tracking-wider"
+                className="px-6 py-2 border border-solid border-black dark:border-white text-black dark:text-white rounded-none hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-all font-bold uppercase tracking-wider"
               >
                 Sign Out
               </button>
@@ -78,14 +78,14 @@ function App() {
               background: '#000',
               color: '#fff',
               borderRadius: '0',
-              border: '2px solid #fff',
+              border: '1px solid #fff',
             },
             dark: {
               style: {
                 background: '#fff',
                 color: '#000',
                 borderRadius: '0',
-                border: '2px solid #000',
+                border: '1px solid #000',
               },
             },
           }}

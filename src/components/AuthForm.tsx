@@ -20,7 +20,7 @@ export default function AuthForm() {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [currency, setCurrency] = useState('USD');
+  const [currency, setCurrency] = useState('BDT');
   const { signIn, signUp } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -39,7 +39,7 @@ export default function AuthForm() {
   };
 
   return (
-    <div className="w-full max-w-md mx-auto p-8 bg-white dark:bg-black rounded-none shadow-lg border-2 border-black dark:border-white">
+    <div className="w-full max-w-md mx-auto p-8 bg-white dark:bg-black rounded-none shadow-lg border border-solid border-black dark:border-white">
       <h2 className="text-3xl font-bold mb-8 text-center tracking-wider text-black dark:text-white uppercase">
         {isLogin ? 'Sign In' : 'Create Account'}
       </h2>
@@ -50,7 +50,7 @@ export default function AuthForm() {
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full px-4 py-3 bg-transparent border-2 border-black dark:border-white text-black dark:text-white rounded-none focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white transition-all"
+            className="w-full px-4 py-3 bg-transparent border border-solid border-black dark:border-white text-black dark:text-white rounded-none focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white transition-all"
             required
             placeholder="Enter your email"
           />
@@ -61,7 +61,7 @@ export default function AuthForm() {
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full px-4 py-3 bg-transparent border-2 border-black dark:border-white text-black dark:text-white rounded-none focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white transition-all"
+            className="w-full px-4 py-3 bg-transparent border border-solid border-black dark:border-white text-black dark:text-white rounded-none focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white transition-all"
             required
             placeholder="Enter your password"
           />
@@ -72,7 +72,7 @@ export default function AuthForm() {
             <select
               value={currency}
               onChange={(e) => setCurrency(e.target.value)}
-              className="w-full px-4 py-3 bg-transparent border-2 border-black dark:border-white text-black dark:text-white rounded-none focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white transition-all"
+              className="w-full px-4 py-3 bg-transparent border border-solid border-black dark:border-white text-black dark:text-white rounded-none focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white transition-all"
               required
             >
               {currencies.map((curr) => (
@@ -85,7 +85,7 @@ export default function AuthForm() {
         )}
         <button
           type="submit"
-          className="w-full py-4 px-6 bg-black dark:bg-white text-white dark:text-black hover:bg-white hover:text-black dark:hover:bg-black dark:hover:text-white border-2 border-black dark:border-white transition-all font-bold uppercase tracking-wider flex items-center justify-center gap-2"
+          className="w-full py-4 px-6 bg-black dark:bg-white text-white dark:text-black hover:bg-white hover:text-black dark:hover:bg-black dark:hover:text-white border border-solid border-black dark:border-white transition-all font-bold uppercase tracking-wider flex items-center justify-center gap-2"
         >
           {isLogin ? (
             <>

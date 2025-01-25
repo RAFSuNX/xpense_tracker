@@ -28,7 +28,7 @@ export default function DigitalClock() {
   );
 
   return (
-    <div className="bg-white dark:bg-black border-2 border-black dark:border-white p-6 rounded-none shadow-lg">
+    <div className="bg-white dark:bg-black border border-solid border-black dark:border-white p-6 rounded-none shadow-lg">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <Clock className="w-5 h-5 text-black dark:text-white" />
@@ -39,7 +39,7 @@ export default function DigitalClock() {
         <select
           value={timezone}
           onChange={(e) => setTimezone(e.target.value)}
-          className="px-3 py-1 bg-white dark:bg-black border-2 border-black dark:border-white text-black dark:text-white rounded-none focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white transition-all text-sm uppercase tracking-wider hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black cursor-pointer"
+          className="px-3 py-1 bg-white dark:bg-black border border-solid border-black dark:border-white text-black dark:text-white rounded-none focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white transition-all text-sm uppercase tracking-wider hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black cursor-pointer"
         >
           {Intl.supportedValuesOf('timeZone').map((tz) => (
             <option key={tz} value={tz}>
