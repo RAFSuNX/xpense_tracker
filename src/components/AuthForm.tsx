@@ -3,10 +3,24 @@ import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-hot-toast';
 import { LogIn, UserPlus } from 'lucide-react';
 
+const currencies = [
+  { code: 'BDT', symbol: 'TK', name: 'Bangladesh Taka' },
+  { code: 'USD', symbol: '$', name: 'US Dollar' },
+  { code: 'EUR', symbol: '€', name: 'Euro' },
+  { code: 'GBP', symbol: '£', name: 'British Pound' },
+  { code: 'JPY', symbol: '¥', name: 'Japanese Yen' },
+  { code: 'AUD', symbol: 'A$', name: 'Australian Dollar' },
+  { code: 'CAD', symbol: 'C$', name: 'Canadian Dollar' },
+  { code: 'CHF', symbol: 'CHF', name: 'Swiss Franc' },
+  { code: 'CNY', symbol: '¥', name: 'Chinese Yuan' },
+  { code: 'INR', symbol: '₹', name: 'Indian Rupee' },
+];
+
 export default function AuthForm() {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [currency, setCurrency] = useState('USD');
   const { signIn, signUp } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -16,7 +30,7 @@ export default function AuthForm() {
         await signIn(email, password);
         toast.success('Authentication successful');
       } else {
-        await signUp(email, password);
+        await signUp(email, password, currency);
         toast.success('Account created successfully');
       }
     } catch (error) {
@@ -52,6 +66,23 @@ export default function AuthForm() {
             placeholder="Enter your password"
           />
         </div>
+        {!isLogin && (
+          <div>
+            <label className="block text-sm font-bold uppercase tracking-wider text-black dark:text-white mb-2">Preferred Currency</label>
+            <select
+              value={currency}
+              onChange={(e) => setCurrency(e.target.value)}
+              className="w-full px-4 py-3 bg-transparent border-2 border-black dark:border-white text-black dark:text-white rounded-none focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white transition-all"
+              required
+            >
+              {currencies.map((curr) => (
+                <option key={curr.code} value={curr.code}>
+                  {curr.code} ({curr.symbol}) - {curr.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <button
           type="submit"
           className="w-full py-4 px-6 bg-black dark:bg-white text-white dark:text-black hover:bg-white hover:text-black dark:hover:bg-black dark:hover:text-white border-2 border-black dark:border-white transition-all font-bold uppercase tracking-wider flex items-center justify-center gap-2"

@@ -15,8 +15,20 @@ interface Expense {
   date: string;
 }
 
+const currencySymbols: { [key: string]: string } = {
+  'USD': '$',
+  'EUR': '€',
+  'GBP': '£',
+  'JPY': '¥',
+  'AUD': 'A$',
+  'CAD': 'C$',
+  'CHF': 'CHF',
+  'CNY': '¥',
+  'INR': '₹'
+};
+
 export default function ExpenseList() {
-  const { user } = useAuth();
+  const { user, userCurrency } = useAuth();
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [total, setTotal] = useState({ income: 0, expense: 0 });
   const [selectedPeriod, setSelectedPeriod] = useState('all');
@@ -26,6 +38,8 @@ export default function ExpenseList() {
   const [customEndTime, setCustomEndTime] = useState('23:59');
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
+
+  const currencySymbol = currencySymbols[userCurrency || 'USD'];
 
   useEffect(() => {
     if (!user) return;
@@ -60,7 +74,6 @@ export default function ExpenseList() {
           999
         );
       } catch (error) {
-        // If there's any error parsing dates, fallback to all time
         startDate = new Date('1970-01-01T00:00:00.000Z');
         endDate = endOfDay(new Date());
       }
@@ -73,7 +86,6 @@ export default function ExpenseList() {
       endDate = endOfDay(new Date());
     }
 
-    // Ensure we have valid dates before creating the query
     if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
       const q = query(
         collection(db, `users/${user.uid}/expenses`),
@@ -114,7 +126,7 @@ export default function ExpenseList() {
       Date: format(new Date(expense.date), 'MMM d, yyyy'),
       Name: expense.name,
       Type: expense.type.charAt(0).toUpperCase() + expense.type.slice(1),
-      Amount: expense.amount.toFixed(2),
+      Amount: `${currencySymbol}${expense.amount.toFixed(2)}`,
       Notes: expense.notes || ''
     }));
 
@@ -148,15 +160,15 @@ export default function ExpenseList() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
         <div className="group p-6 bg-white dark:bg-black rounded-none shadow-lg border-2 border-black dark:border-white transition-all hover:bg-black dark:hover:bg-white cursor-pointer">
           <h3 className="text-sm font-medium uppercase tracking-wider mb-1 text-black dark:text-white group-hover:text-white dark:group-hover:text-black transition-colors">Total Income</h3>
-          <p className="text-3xl font-bold text-black dark:text-white group-hover:text-white dark:group-hover:text-black transition-colors">${total.income.toFixed(2)}</p>
+          <p className="text-3xl font-bold text-black dark:text-white group-hover:text-white dark:group-hover:text-black transition-colors">{currencySymbol}{total.income.toFixed(2)}</p>
         </div>
         <div className="group p-6 bg-white dark:bg-black rounded-none shadow-lg border-2 border-black dark:border-white transition-all hover:bg-black dark:hover:bg-white cursor-pointer">
           <h3 className="text-sm font-medium uppercase tracking-wider mb-1 text-black dark:text-white group-hover:text-white dark:group-hover:text-black transition-colors">Total Expenses</h3>
-          <p className="text-3xl font-bold text-black dark:text-white group-hover:text-white dark:group-hover:text-black transition-colors">${total.expense.toFixed(2)}</p>
+          <p className="text-3xl font-bold text-black dark:text-white group-hover:text-white dark:group-hover:text-black transition-colors">{currencySymbol}{total.expense.toFixed(2)}</p>
         </div>
         <div className="group p-6 bg-white dark:bg-black rounded-none shadow-lg border-2 border-black dark:border-white transition-all hover:bg-black dark:hover:bg-white cursor-pointer">
           <h3 className="text-sm font-medium uppercase tracking-wider mb-1 text-black dark:text-white group-hover:text-white dark:group-hover:text-black transition-colors">Net Balance</h3>
-          <p className="text-3xl font-bold text-black dark:text-white group-hover:text-white dark:group-hover:text-black transition-colors">${(total.income - total.expense).toFixed(2)}</p>
+          <p className="text-3xl font-bold text-black dark:text-white group-hover:text-white dark:group-hover:text-black transition-colors">{currencySymbol}{(total.income - total.expense).toFixed(2)}</p>
         </div>
       </div>
 
@@ -259,7 +271,7 @@ export default function ExpenseList() {
                 </div>
                 <div className="text-right">
                   <p className="text-lg font-bold">
-                    {expense.type === 'income' ? '+' : '-'}${expense.amount.toFixed(2)}
+                    {expense.type === 'income' ? '+' : '-'}{currencySymbol}{expense.amount.toFixed(2)}
                   </p>
                   <p className="text-sm uppercase tracking-wider opacity-80">
                     {expense.type}
@@ -377,7 +389,7 @@ export default function ExpenseList() {
                 <div>
                   <p className="text-sm uppercase tracking-wider text-black dark:text-white opacity-70">Amount</p>
                   <p className="text-black dark:text-white font-bold">
-                    {selectedExpense.type === 'income' ? '+' : '-'}${selectedExpense.amount.toFixed(2)}
+                    {selectedExpense.type === 'income' ? '+' : '-'}{currencySymbol}{selectedExpense.amount.toFixed(2)}
                   </p>
                 </div>
                 <div>
