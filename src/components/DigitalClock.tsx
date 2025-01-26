@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { format } from 'date-fns';
-import { Clock } from 'lucide-react';
+import { Calendar } from 'lucide-react';
 
 export default function DigitalClock() {
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [timezone, setTimezone] = useState(Intl.DateTimeFormat().resolvedOptions().timeZone);
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -31,22 +31,12 @@ export default function DigitalClock() {
     <div className="bg-white dark:bg-black border border-solid border-black dark:border-white p-6 rounded-none shadow-lg">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <Clock className="w-5 h-5 text-black dark:text-white" />
+          <Calendar className="w-5 h-5 text-black dark:text-white" />
           <h2 className="text-sm font-bold uppercase tracking-wider text-black dark:text-white">
             Current Time
           </h2>
         </div>
-        <select
-          value={timezone}
-          onChange={(e) => setTimezone(e.target.value)}
-          className="px-3 py-1 bg-white dark:bg-black border border-solid border-black dark:border-white text-black dark:text-white rounded-none focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white transition-all text-sm uppercase tracking-wider hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black cursor-pointer"
-        >
-          {Intl.supportedValuesOf('timeZone').map((tz) => (
-            <option key={tz} value={tz}>
-              {tz.replace(/_/g, ' ')}
-            </option>
-          ))}
-        </select>
+        <span className="text-sm text-black dark:text-white opacity-70">{timezone}</span>
       </div>
       <div className="space-y-1">
         <p className="text-4xl font-bold text-black dark:text-white font-mono">

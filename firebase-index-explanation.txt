@@ -1,0 +1,54 @@
+# Understanding the Firebase Indexes
+
+## Index 1: Settlement Transactions
+Collection: users/{userId}/expenses
+Fields:
+- isSettlement (Ascending)
+- date (Descending)
+
+This index allows efficient querying of:
+1. Finding all settlement transactions
+2. Sorting them by date (newest first)
+3. Used when you want to find all transactions where someone paid back borrowed money or received lent money
+
+Example Query:
+```typescript
+const q = query(
+  collection(db, `users/${userId}/expenses`),
+  where('isSettlement', '==', true),  // Find all settlements
+  orderBy('date', 'desc')             // Sort by date, newest first
+);
+```
+
+## Index 2: Related Transactions
+Collection: users/{userId}/expenses
+Fields:
+- relatedTransactionId (Ascending)
+- date (Descending)
+
+This index allows efficient querying of:
+1. Finding all transactions related to a specific original transaction
+2. Sorting them by date (newest first)
+3. Used when you want to find all settlement payments for a specific borrowed/lent transaction
+
+Example Query:
+```typescript
+const q = query(
+  collection(db, `users/${userId}/expenses`),
+  where('relatedTransactionId', '==', 'original-transaction-id'),  // Find all related transactions
+  orderBy('date', 'desc')                                         // Sort by date, newest first
+);
+```
+
+## How to Create These Indexes in Firebase Console:
+
+1. Go to Firebase Console
+2. Click "Firestore Database" → "Indexes" tab
+3. Click "Add Index"
+4. For each index:
+   - Collection ID: users/{userId}/expenses
+   - Add the fields in order
+   - Set the order (Ascending/Descending)
+   - Create Index
+
+These indexes are essential for the settlement feature to work efficiently in your expense tracker.

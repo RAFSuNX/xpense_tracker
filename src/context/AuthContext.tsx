@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from 'react';
-import { 
+import {
   User,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
@@ -9,13 +9,15 @@ import {
   sendPasswordResetEmail
 } from 'firebase/auth';
 import { auth, db } from '../lib/firebase';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, onSnapshot } from 'firebase/firestore';
 import { toast } from 'react-hot-toast';
+import { UserData } from '../types';
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
   userCurrency: string | null;
+  userData: UserData | null;
   signUp: (email: string, password: string, currency: string) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -31,17 +33,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [userCurrency, setUserCurrency] = useState<string | null>(null);
+  const [userData, setUserData] = useState<UserData | null>(null);
+
+  // Subscribe to user document changes
+  useEffect(() => {
+    if (!user) return;
+
+    const unsubscribe = onSnapshot(doc(db, 'users', user.uid), (doc) => {
+      if (doc.exists()) {
+        const data = doc.data() as UserData;
+        setUserCurrency(data.currency);
+        setUserData(data);
+      }
+    });
+
+    return unsubscribe;
+  }, [user]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setUser(user);
-      if (user) {
-        const userDoc = await getDoc(doc(db, 'users', user.uid));
-        if (userDoc.exists()) {
-          setUserCurrency(userDoc.data().currency);
-        }
-      } else {
+      if (!user) {
         setUserCurrency(null);
+        setUserData(null);
       }
       setLoading(false);
     });
@@ -51,12 +65,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signUp = async (email: string, password: string, currency: string) => {
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-    await setDoc(doc(db, 'users', userCredential.user.uid), {
+    const initialUserData: UserData = {
       email,
       currency,
+      balance: 0,
+      totalIncome: 0,
+      totalExpense: 0,
+      totalPayable: 0,
+      totalReceivable: 0,
       createdAt: new Date().toISOString()
+    };
+    
+    await setDoc(doc(db, 'users', userCredential.user.uid), {
+      ...initialUserData
     });
     setUserCurrency(currency);
+    setUserData(initialUserData);
     
     // Send verification email
     await sendEmailVerification(userCredential.user);
@@ -67,13 +91,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
     const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
     if (userDoc.exists()) {
-      setUserCurrency(userDoc.data().currency);
+      const data = userDoc.data() as UserData;
+      setUserCurrency(data.currency);
+      setUserData(data);
     }
   };
 
   const logout = async () => {
     await signOut(auth);
     setUserCurrency(null);
+    setUserData(null);
   };
 
   const resendVerificationEmail = async () => {
@@ -92,6 +119,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       user, 
       loading, 
       userCurrency, 
+      userData,
       signUp, 
       signIn, 
       logout,

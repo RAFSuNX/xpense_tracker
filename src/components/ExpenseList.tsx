@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { format, subMonths, startOfMonth, endOfMonth, parseISO, endOfDay, startOfDay } from 'date-fns';
 import { ArrowDownCircle, ArrowUpCircle, Download, X, Calendar, Save, Edit2, ArrowLeftCircle, ArrowRightCircle, Search } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { calculateNewBalances, calculateBalanceFromTransactions } from '../lib/calculations';
 
 interface Expense {
   id: string;
@@ -29,10 +30,27 @@ const currencySymbols: { [key: string]: string } = {
 };
 
 export default function ExpenseList() {
-  const { user, userCurrency } = useAuth();
+  const { user, userCurrency, userData } = useAuth();
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [filteredExpenses, setFilteredExpenses] = useState<Expense[]>([]);
-  const [total, setTotal] = useState({ income: 0, expense: 0, payable: 0, receivable: 0 });
+  const [total, setTotal] = useState({
+    income: userData?.totalIncome || 0,
+    expense: userData?.totalExpense || 0,
+    payable: userData?.totalPayable || 0,
+    receivable: userData?.totalReceivable || 0
+  });
+
+  // Initialize totals from userData when it changes
+  useEffect(() => {
+    if (userData) {
+      setTotal({
+        income: userData.totalIncome || 0,
+        expense: userData.totalExpense || 0,
+        payable: userData.totalPayable || 0,
+        receivable: userData.totalReceivable || 0
+      });
+    }
+  }, [userData]);
   const [selectedPeriod, setSelectedPeriod] = useState('all');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
@@ -43,10 +61,36 @@ export default function ExpenseList() {
   const [showFilters, setShowFilters] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Calculate totals and balance from all transactions
+  useEffect(() => {
+    if (expenses.length > 0) {
+      const calculatedData = calculateBalanceFromTransactions(expenses);
+      
+      // Update user data in Firestore with recalculated values
+      if (user) {
+        updateDoc(doc(db, 'users', user.uid), {
+          balance: calculatedData.balance,
+          totalIncome: calculatedData.totalIncome,
+          totalExpense: calculatedData.totalExpense,
+          totalPayable: calculatedData.totalPayable,
+          totalReceivable: calculatedData.totalReceivable
+        });
+
+        // Update totals after successful Firestore update
+        setTotal({
+          income: calculatedData.totalIncome,
+          expense: calculatedData.totalExpense,
+          payable: calculatedData.totalPayable,
+          receivable: calculatedData.totalReceivable
+        });
+      }
+    }
+  }, [expenses, user]);
+
   const currencySymbol = currencySymbols[userCurrency || 'USD'];
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || !userData) return;
 
     let startDate: Date;
     let endDate: Date;
@@ -106,16 +150,6 @@ export default function ExpenseList() {
 
         setExpenses(expenseData);
         setFilteredExpenses(expenseData);
-
-        const totals = expenseData.reduce(
-          (acc, curr) => {
-            acc[curr.type] += curr.amount;
-            return acc;
-          },
-          { income: 0, expense: 0, payable: 0, receivable: 0 }
-        );
-
-        setTotal(totals);
       });
 
       return unsubscribe;
@@ -184,45 +218,93 @@ export default function ExpenseList() {
   };
 
   const handleUpdateExpense = async () => {
-    if (!user || !editingExpense) return;
+    if (!user || !editingExpense || !userData) return;
+
+    if (isNaN(editingExpense.amount) || editingExpense.amount <= 0) {
+      toast.error('Please enter a valid positive amount');
+      return;
+    }
+
+    // Prevent changing type if it's a settlement transaction
+    if (editingExpense.isSettlement && editingExpense.type !== selectedExpense?.type) {
+      toast.error('Cannot change type of settlement transactions');
+      setEditingExpense({ ...editingExpense, type: selectedExpense?.type || editingExpense.type });
+      return;
+    }
 
     try {
+      // Calculate new balances
+      const newUserData = calculateNewBalances(
+        userData,
+        editingExpense.amount,
+        editingExpense.type
+      );
+
+      // Update user data with new balances
+      await updateDoc(doc(db, 'users', user.uid), newUserData);
+
+      // Update transaction record
       const expenseRef = doc(db, `users/${user.uid}/expenses`, editingExpense.id);
-      await updateDoc(expenseRef, {
+      const updateData = {
         name: editingExpense.name,
         amount: editingExpense.amount,
         type: editingExpense.type,
         notes: editingExpense.notes
-      });
+      };
+      
+      await updateDoc(expenseRef, updateData);
       setEditingExpense(null);
+      setSelectedExpense(null);
+      toast.success('Transaction updated successfully');
     } catch (error) {
-      console.error('Error updating expense:', error);
+      if (error.message === 'Balance cannot be negative after transaction.') {
+        toast.error('Insufficient balance for this update');
+      } else {
+        toast.error('Failed to update transaction. Please try again.');
+      }
     }
   };
 
   return (
     <div className="space-y-8">
+      <div className="p-4 sm:p-6 bg-white dark:bg-black rounded-none shadow-lg border border-solid border-black dark:border-white">
+        <h3 className="text-sm font-medium uppercase tracking-wider mb-1 text-black dark:text-white">
+          Current Balance
+        </h3>
+        <p className="text-2xl sm:text-3xl md:text-4xl font-bold text-black dark:text-white">
+          {currencySymbol}{(userData?.balance || 0).toFixed(2)}
+        </p>
+      </div>
+
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
         <div className="group p-6 bg-white dark:bg-black rounded-none shadow-lg border border-solid border-black dark:border-white transition-all hover:bg-black dark:hover:bg-white cursor-pointer">
           <h3 className="text-sm font-medium uppercase tracking-wider mb-1 text-black dark:text-white group-hover:text-white dark:group-hover:text-black transition-colors">Total Income</h3>
-          <p className="text-xl md:text-3xl font-bold text-black dark:text-white group-hover:text-white dark:group-hover:text-black transition-colors">{currencySymbol}{total.income.toFixed(2)}</p>
+          <p className="text-lg sm:text-xl md:text-3xl font-bold text-black dark:text-white group-hover:text-white dark:group-hover:text-black transition-colors">
+            {currencySymbol}{(total.income || 0).toFixed(2)}
+          </p>
         </div>
         <div className="group p-6 bg-white dark:bg-black rounded-none shadow-lg border border-solid border-black dark:border-white transition-all hover:bg-black dark:hover:bg-white cursor-pointer">
           <h3 className="text-sm font-medium uppercase tracking-wider mb-1 text-black dark:text-white group-hover:text-white dark:group-hover:text-black transition-colors">Total Expenses</h3>
-          <p className="text-xl md:text-3xl font-bold text-black dark:text-white group-hover:text-white dark:group-hover:text-black transition-colors">{currencySymbol}{total.expense.toFixed(2)}</p>
+          <p className="text-xl md:text-3xl font-bold text-black dark:text-white group-hover:text-white dark:group-hover:text-black transition-colors">
+            {currencySymbol}{total.expense ? total.expense.toFixed(2) : '0.00'}
+          </p>
         </div>
         <div className="group p-6 bg-white dark:bg-black rounded-none shadow-lg border border-solid border-black dark:border-white transition-all hover:bg-black dark:hover:bg-white cursor-pointer">
           <h3 className="text-sm font-medium uppercase tracking-wider mb-1 text-black dark:text-white group-hover:text-white dark:group-hover:text-black transition-colors">Total Payable</h3>
-          <p className="text-xl md:text-3xl font-bold text-black dark:text-white group-hover:text-white dark:group-hover:text-black transition-colors">{currencySymbol}{total.payable.toFixed(2)}</p>
+          <p className="text-xl md:text-3xl font-bold text-black dark:text-white group-hover:text-white dark:group-hover:text-black transition-colors">
+            {currencySymbol}{total.payable ? total.payable.toFixed(2) : '0.00'}
+          </p>
         </div>
         <div className="group p-6 bg-white dark:bg-black rounded-none shadow-lg border border-solid border-black dark:border-white transition-all hover:bg-black dark:hover:bg-white cursor-pointer">
           <h3 className="text-sm font-medium uppercase tracking-wider mb-1 text-black dark:text-white group-hover:text-white dark:group-hover:text-black transition-colors">Total Receivable</h3>
-          <p className="text-xl md:text-3xl font-bold text-black dark:text-white group-hover:text-white dark:group-hover:text-black transition-colors">{currencySymbol}{total.receivable.toFixed(2)}</p>
+          <p className="text-xl md:text-3xl font-bold text-black dark:text-white group-hover:text-white dark:group-hover:text-black transition-colors">
+            {currencySymbol}{total.receivable ? total.receivable.toFixed(2) : '0.00'}
+          </p>
         </div>
       </div>
 
       <div className="bg-white dark:bg-black rounded-none shadow-lg border border-solid border-black dark:border-white overflow-hidden">
-        <div className="p-4 md:p-6 border-b border-solid border-black dark:border-white">
+        <div className="p-3 sm:p-4 md:p-6 border-b border-solid border-black dark:border-white">
           <div className="flex flex-wrap gap-4 justify-between items-center mb-4">
             <h2 className="text-xl font-bold text-black dark:text-white uppercase tracking-wider">Transaction History</h2>
             <div className="flex gap-4">
@@ -232,7 +314,7 @@ export default function ExpenseList() {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search transactions..."
-                  className="w-full pl-10 pr-4 py-2 bg-white dark:bg-black border border-solid border-black dark:border-white text-black dark:text-white rounded-none focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white transition-all placeholder-gray-500 dark:placeholder-gray-400"
+                  className="w-full pl-10 pr-4 py-2 bg-white dark:bg-black border border-solid border-black dark:border-white text-black dark:text-white rounded-none focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white transition-all placeholder-gray-500 dark:placeholder-gray-400 touch-manipulation"
                 />
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500 dark:text-gray-400" />
               </div>
@@ -249,7 +331,7 @@ export default function ExpenseList() {
             <select
               value={selectedPeriod}
               onChange={(e) => setSelectedPeriod(e.target.value)}
-              className="w-full md:w-auto px-4 py-2 bg-white dark:bg-black border border-solid border-black dark:border-white text-black dark:text-white rounded-none focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white transition-all uppercase tracking-wider appearance-none cursor-pointer hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black"
+              className="w-full md:w-auto min-w-[150px] max-w-full px-4 py-2 bg-white dark:bg-black border border-solid border-black dark:border-white text-black dark:text-white rounded-none focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white transition-all uppercase tracking-wider appearance-none cursor-pointer hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black text-ellipsis"
             >
               <option value="all">All Time</option>
               <option value="1">Last Month</option>
@@ -348,8 +430,8 @@ export default function ExpenseList() {
       </div>
 
       {selectedExpense && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white dark:bg-black border border-solid border-black dark:border-white p-4 md:p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center p-0 sm:p-4 z-50">
+          <div className="bg-white dark:bg-black border border-solid border-black dark:border-white p-4 md:p-6 w-full sm:max-w-lg max-h-[90vh] overflow-y-auto rounded-t-lg sm:rounded-none">
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-xl font-bold text-black dark:text-white uppercase tracking-wider">
                 Transaction Details
@@ -359,7 +441,7 @@ export default function ExpenseList() {
                   setSelectedExpense(null);
                   setEditingExpense(null);
                 }}
-                className="text-black dark:text-white hover:opacity-70 transition-opacity"
+                className="text-black dark:text-white hover:opacity-70 transition-opacity p-2 touch-manipulation"
               >
                 <X className="w-6 h-6" />
               </button>
@@ -396,7 +478,7 @@ export default function ExpenseList() {
                   <select
                     value={editingExpense.type}
                     onChange={(e) => setEditingExpense({ ...editingExpense, type: e.target.value as 'income' | 'expense' | 'payable' | 'receivable' })}
-                    className="w-full px-4 py-2 bg-transparent border border-solid border-black dark:border-white text-black dark:text-white rounded-none"
+                    className="w-full px-4 py-2 bg-transparent border border-solid border-black dark:border-white text-black dark:text-white rounded-none appearance-none text-ellipsis"
                   >
                     <option value="income">Income</option>
                     <option value="expense">Expense</option>

@@ -12,4 +12,25 @@
   body {
     @apply antialiased;
   }
+
+  /* Improve touch targets */
+  @media (max-width: 640px) {
+    input,
+    select,
+    textarea,
+    button {
+      font-size: 16px !important; /* Prevent iOS zoom */
+    }
+  }
+
+  /* Add smooth scrolling */
+  html {
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Prevent pull-to-refresh on mobile */
+  body {
+    overscroll-behavior-y: contain;
+  }
 }

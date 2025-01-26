@@ -1,0 +1,159 @@
+# Required Firebase Indexes for Expense Tracker
+
+## Collection Path: users/{userId}/expenses
+
+### 1. Settlement Transactions Index
+Fields:
+- isSettlement (Ascending)
+- date (Descending)
+
+Purpose: 
+- Efficiently query all settlement transactions
+- Sort settlement transactions by date
+- Used for finding payments of borrowed money or receiving of lent money
+
+### 2. Related Transactions Index
+Fields:
+- relatedTransactionId (Ascending)
+- date (Descending)
+
+Purpose:
+- Find all transactions related to a specific original transaction
+- Sort related transactions by date
+- Used for tracking payments against borrowed/lent amounts
+
+### 3. Transaction Type Index
+Fields:
+- type (Ascending)
+- date (Descending)
+
+Purpose:
+- Filter transactions by type (payable/receivable)
+- Sort filtered transactions by date
+- Used for displaying settlement options in the transaction form
+
+### 4. Date Range Index
+Fields:
+- date (Ascending)
+- date (Descending)
+
+Purpose:
+- Filter transactions by date range
+- Sort filtered transactions by date
+- Used for the transaction history list with date filtering
+
+### 5. Type and Date Range Index
+Fields:
+- type (Ascending)
+- date (Ascending)
+- date (Descending)
+
+Purpose:
+- Filter transactions by type within a date range
+- Sort filtered transactions by date
+- Used for filtering specific transaction types within a time period
+
+### 6. Settlement Status and Type Index
+Fields:
+- isSettlement (Ascending)
+- type (Ascending)
+- date (Descending)
+
+Purpose:
+- Filter settlement transactions by type
+- Sort filtered transactions by date
+- Used for analyzing settlements by transaction type
+
+### 7. Search Index
+Fields:
+- name (Ascending)
+- date (Descending)
+
+Purpose:
+- Enable efficient text-based searches on transaction names
+- Sort search results by date
+- Used for the search functionality in the transaction list
+
+## How to Create These Indexes
+
+1. Go to Firebase Console (https://console.firebase.google.com)
+2. Select your project
+3. Navigate to "Firestore Database" → "Indexes" tab
+4. Click "Create Index"
+5. For each index:
+   - Set Collection ID to: users/{userId}/expenses
+   - Add fields in the specified order
+   - Set Ascending/Descending as specified
+   - Click Create Index
+
+## Important Notes
+
+1. Wait for indexes to finish building before using related queries
+2. Status will change from "Building" to "Enabled" when ready
+3. These indexes support all query patterns used in the application:
+   ```typescript
+   // Settlement queries
+   query(
+     collection(db, `users/${userId}/expenses`),
+     where('isSettlement', '==', true),
+     orderBy('date', 'desc')
+   )
+
+   // Related transaction queries
+   query(
+     collection(db, `users/${userId}/expenses`),
+     where('relatedTransactionId', '==', 'someId'),
+     orderBy('date', 'desc')
+   )
+
+   // Type filtering queries
+   query(
+     collection(db, `users/${userId}/expenses`),
+     where('type', 'in', ['payable', 'receivable']),
+     orderBy('date', 'desc')
+   )
+
+   // Date range queries
+   query(
+     collection(db, `users/${userId}/expenses`),
+     where('date', '>=', startDate),
+     where('date', '<=', endDate),
+     orderBy('date', 'desc')
+   )
+
+   // Type and date range queries
+   query(
+     collection(db, `users/${userId}/expenses`),
+     where('type', '==', 'expense'),
+     where('date', '>=', startDate),
+     where('date', '<=', endDate),
+     orderBy('date', 'desc')
+   )
+
+   // Settlement and type queries
+   query(
+     collection(db, `users/${userId}/expenses`),
+     where('isSettlement', '==', true),
+     where('type', '==', 'expense'),
+     orderBy('date', 'desc')
+   )
+
+   // Search queries
+   query(
+     collection(db, `users/${userId}/expenses`),
+     where('name', '>=', searchTerm),
+     where('name', '<=', searchTerm + '\uf8ff'),
+     orderBy('name'),
+     orderBy('date', 'desc')
+   )
+   ```
+
+## Automatic Indexes
+Note: Single-field indexes are created automatically by Firebase for:
+- date
+- isSettlement
+- relatedTransactionId
+- type
+- name
+
+No need to manually create these.

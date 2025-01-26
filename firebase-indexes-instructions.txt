@@ -1,0 +1,59 @@
+# How to Create Firebase Indexes for Expense Tracker
+
+1. Go to Firebase Console:
+   - Visit https://console.firebase.google.com
+   - Select your project: expense-tracker-ad1c0
+
+2. Navigate to Indexes:
+   - Click "Firestore Database" in the left sidebar
+   - Select the "Indexes" tab
+   - Click "Create Index"
+
+3. Create Index for Settlement Transactions:
+   Collection ID: users/{userId}/expenses
+   
+   Fields:
+   - isSettlement (Ascending)
+   - date (Descending)
+   
+   Click "Create Index"
+
+4. Create Index for Related Transactions:
+   Collection ID: users/{userId}/expenses
+   
+   Fields:
+   - relatedTransactionId (Ascending)
+   - date (Descending)
+   
+   Click "Create Index"
+
+Important Notes:
+- Indexes take a few minutes to build
+- You'll see a "Building" status while the index is being created
+- Wait for the status to change to "Enabled" before using queries that depend on these indexes
+- These indexes support queries that:
+  1. Find all settlement transactions sorted by date
+  2. Find all transactions related to a specific original transaction sorted by date
+
+Example Queries These Indexes Support:
+
+```typescript
+// Query settlement transactions
+const settlementQuery = query(
+  collection(db, `users/${userId}/expenses`),
+  where('isSettlement', '==', true),
+  orderBy('date', 'desc')
+);
+
+// Query related transactions
+const relatedQuery = query(
+  collection(db, `users/${userId}/expenses`),
+  where('relatedTransactionId', '==', 'some-id'),
+  orderBy('date', 'desc')
+);
+```
+
+Verification:
+- After creating indexes, they should appear in the Indexes list
+- Status should change from "Building" to "Enabled"
+- Your queries should work without any "missing index" errors
