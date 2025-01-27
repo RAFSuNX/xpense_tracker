@@ -5,16 +5,62 @@ import { useAuth } from '../context/AuthContext';
 import { format, subMonths, startOfMonth, endOfMonth, parseISO, endOfDay, startOfDay } from 'date-fns';
 import { ArrowDownCircle, ArrowUpCircle, Download, X, Calendar, Save, Edit2, ArrowLeftCircle, ArrowRightCircle, Search } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { calculateNewBalances, calculateBalanceFromTransactions } from '../lib/calculations';
+import { Transaction } from '../types';
 
-interface Expense {
-  id: string;
-  name: string;
-  amount: number;
-  type: 'income' | 'expense' | 'payable' | 'receivable';
-  notes: string;
-  date: string;
-}
+// Calculate totals from transactions
+const calculateTotals = (transactions: Transaction[]) => {
+  return transactions.reduce((acc, transaction) => {
+    const { amount, type, isSettlement, relatedTransactionId } = transaction;
+    
+    if (isSettlement) {
+      if (type === 'expense') {
+        // Paying back borrowed money
+        acc.payable = Math.max(0, acc.payable - amount);
+        acc.balance -= amount; // Decrease balance when paying back
+      } else if (type === 'income') {
+        // Receiving lent money back
+        acc.receivable = Math.max(0, acc.receivable - amount);
+        acc.balance += amount; // Increase balance when receiving back
+      }
+    } else {
+      // For regular transactions
+      switch (type) {
+        case 'income':
+          if (!isSettlement) {
+            acc.income += amount;
+            acc.balance += amount;
+          }
+          break;
+        case 'expense':
+          if (!isSettlement) {
+            acc.expense += amount;
+            acc.balance -= amount;
+          }
+          break;
+        case 'payable':
+          if (!isSettlement) {
+            acc.payable += amount;
+            acc.balance += amount; // Borrowing increases balance
+          }
+          break;
+        case 'receivable':
+          if (!isSettlement) {
+            acc.receivable += amount;
+            acc.balance -= amount; // Lending decreases balance
+          }
+          break;
+      }
+    }
+    
+    return acc;
+  }, {
+    income: 0,
+    expense: 0,
+    payable: 0,
+    receivable: 0,
+    balance: 0
+  });
+};
 
 const currencySymbols: { [key: string]: string } = {
   'BDT': 'TK ',
@@ -31,26 +77,21 @@ const currencySymbols: { [key: string]: string } = {
 
 export default function ExpenseList() {
   const { user, userCurrency, userData } = useAuth();
-  const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [filteredExpenses, setFilteredExpenses] = useState<Expense[]>([]);
+  const [expenses, setExpenses] = useState<Transaction[]>([]);
+  const [filteredExpenses, setFilteredExpenses] = useState<Transaction[]>([]);
   const [total, setTotal] = useState({
-    income: userData?.totalIncome || 0,
-    expense: userData?.totalExpense || 0,
-    payable: userData?.totalPayable || 0,
-    receivable: userData?.totalReceivable || 0
+    income: 0,
+    expense: 0,
+    payable: 0,
+    receivable: 0,
+    balance: 0
   });
 
-  // Initialize totals from userData when it changes
+  // Calculate totals whenever expenses change
   useEffect(() => {
-    if (userData) {
-      setTotal({
-        income: userData.totalIncome || 0,
-        expense: userData.totalExpense || 0,
-        payable: userData.totalPayable || 0,
-        receivable: userData.totalReceivable || 0
-      });
-    }
-  }, [userData]);
+    const newTotals = calculateTotals(expenses);
+    setTotal(newTotals);
+  }, [expenses]);
   const [selectedPeriod, setSelectedPeriod] = useState('all');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
@@ -61,36 +102,10 @@ export default function ExpenseList() {
   const [showFilters, setShowFilters] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Calculate totals and balance from all transactions
-  useEffect(() => {
-    if (expenses.length > 0) {
-      const calculatedData = calculateBalanceFromTransactions(expenses);
-      
-      // Update user data in Firestore with recalculated values
-      if (user) {
-        updateDoc(doc(db, 'users', user.uid), {
-          balance: calculatedData.balance,
-          totalIncome: calculatedData.totalIncome,
-          totalExpense: calculatedData.totalExpense,
-          totalPayable: calculatedData.totalPayable,
-          totalReceivable: calculatedData.totalReceivable
-        });
-
-        // Update totals after successful Firestore update
-        setTotal({
-          income: calculatedData.totalIncome,
-          expense: calculatedData.totalExpense,
-          payable: calculatedData.totalPayable,
-          receivable: calculatedData.totalReceivable
-        });
-      }
-    }
-  }, [expenses, user]);
-
   const currencySymbol = currencySymbols[userCurrency || 'USD'];
 
   useEffect(() => {
-    if (!user || !userData) return;
+    if (!user) return;
 
     let startDate: Date;
     let endDate: Date;
@@ -135,12 +150,23 @@ export default function ExpenseList() {
     }
 
     if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
-      const q = query(
-        collection(db, `users/${user.uid}/expenses`),
-        where('date', '>=', startDate.toISOString()),
-        where('date', '<=', endDate.toISOString()),
-        orderBy('date', 'desc')
-      );
+      let q;
+      
+      if (selectedPeriod === 'all') {
+        // For 'all' time, just order by date without date filters
+        q = query(
+          collection(db, `users/${user.uid}/expenses`),
+          orderBy('date', 'desc')
+        );
+      } else {
+        // For specific time periods, include date filters
+        q = query(
+          collection(db, `users/${user.uid}/expenses`),
+          where('date', '>=', startDate.toISOString()),
+          where('date', '<=', endDate.toISOString()),
+          orderBy('date', 'desc')
+        );
+      }
 
       const unsubscribe = onSnapshot(q, (snapshot) => {
         const expenseData = snapshot.docs.map((doc) => ({
@@ -220,39 +246,74 @@ export default function ExpenseList() {
   const handleUpdateExpense = async () => {
     if (!user || !editingExpense || !userData) return;
 
-    if (isNaN(editingExpense.amount) || editingExpense.amount <= 0) {
-      toast.error('Please enter a valid positive amount');
-      return;
-    }
-
-    // Prevent changing type if it's a settlement transaction
-    if (editingExpense.isSettlement && editingExpense.type !== selectedExpense?.type) {
-      toast.error('Cannot change type of settlement transactions');
-      setEditingExpense({ ...editingExpense, type: selectedExpense?.type || editingExpense.type });
-      return;
-    }
-
     try {
-      // Calculate new balances
-      const newUserData = calculateNewBalances(
-        userData,
-        editingExpense.amount,
-        editingExpense.type
-      );
+      await runTransaction(db, async (transaction) => {
+        // Get the latest user data
+        const userRef = doc(db, 'users', user.uid);
+        const userDoc = await transaction.get(userRef);
+        if (!userDoc.exists()) {
+          throw new Error('User document not found');
+        }
 
-      // Update user data with new balances
-      await updateDoc(doc(db, 'users', user.uid), newUserData);
+        const currentData = userDoc.data();
+        let newData = { ...currentData };
 
-      // Update transaction record
-      const expenseRef = doc(db, `users/${user.uid}/expenses`, editingExpense.id);
-      const updateData = {
-        name: editingExpense.name,
-        amount: editingExpense.amount,
-        type: editingExpense.type,
-        notes: editingExpense.notes
-      };
-      
-      await updateDoc(expenseRef, updateData);
+        // Revert old transaction
+        switch (selectedExpense?.type) {
+          case "income":
+            newData.balance -= selectedExpense.amount;
+            newData.totalIncome -= selectedExpense.amount;
+            break;
+          case "expense":
+            newData.balance += selectedExpense.amount;
+            newData.totalExpense -= selectedExpense.amount;
+            break;
+          case "payable":
+            newData.totalPayable -= selectedExpense.amount;
+            newData.balance -= selectedExpense.amount;
+            break;
+          case "receivable":
+            newData.totalReceivable -= selectedExpense.amount;
+            newData.balance += selectedExpense.amount;
+            break;
+        }
+
+        // Apply new transaction
+        switch (editingExpense.type) {
+          case "income":
+            newData.balance += editingExpense.amount;
+            newData.totalIncome += editingExpense.amount;
+            break;
+          case "expense":
+            if (newData.balance - editingExpense.amount < 0) {
+              throw new Error('Insufficient balance');
+            }
+            newData.balance -= editingExpense.amount;
+            newData.totalExpense += editingExpense.amount;
+            break;
+          case "payable":
+            newData.totalPayable += editingExpense.amount;
+            newData.balance += editingExpense.amount;
+            break;
+          case "receivable":
+            newData.totalReceivable += editingExpense.amount;
+            newData.balance -= editingExpense.amount;
+            break;
+        }
+
+        // Update user data
+        transaction.update(userRef, newData);
+
+        // Update transaction
+        const expenseRef = doc(db, `users/${user.uid}/expenses`, editingExpense.id);
+        transaction.update(expenseRef, {
+          name: editingExpense.name,
+          amount: editingExpense.amount,
+          type: editingExpense.type,
+          notes: editingExpense.notes
+        });
+      });
+
       setEditingExpense(null);
       setSelectedExpense(null);
       toast.success('Transaction updated successfully');
@@ -272,7 +333,7 @@ export default function ExpenseList() {
           Current Balance
         </h3>
         <p className="text-2xl sm:text-3xl md:text-4xl font-bold text-black dark:text-white">
-          {currencySymbol}{(userData?.balance || 0).toFixed(2)}
+          {currencySymbol}{(total.balance || 0).toFixed(2)}
         </p>
       </div>
 

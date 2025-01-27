@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { PlusCircle } from 'lucide-react';
-import { addDoc, collection, doc, updateDoc, query, where, orderBy, onSnapshot } from 'firebase/firestore';
+import { addDoc, collection, doc, updateDoc, query, where, orderBy, onSnapshot, runTransaction } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-hot-toast';
-import { calculateNewBalances, calculateBalanceFromTransactions } from '../lib/calculations';
 import { Transaction } from '../types';
 
 export default function ExpenseForm() {
@@ -78,17 +77,7 @@ export default function ExpenseForm() {
         createdAt: new Date().toISOString()
       };
 
-      // Calculate new balances
-      const newUserData = calculateNewBalances(
-        userData,
-        parsedAmount,
-        type,
-        isSettlement,
-        selectedTransaction
-      );
-
-      await updateDoc(doc(db, 'users', user.uid), newUserData);
-
+      // Add new transaction to Firebase
       await addDoc(collection(db, `users/${user.uid}/expenses`), transactionData);
 
       setName('');

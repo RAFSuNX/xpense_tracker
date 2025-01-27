@@ -1,46 +1,5 @@
 import { UserData, Transaction } from '../types';
 
-export const calculateBalanceFromTransactions = (transactions: Transaction[]): UserData => {
-  const initialData: UserData = {
-    email: '',
-    currency: '',
-    balance: 0,
-    totalIncome: 0,
-    totalExpense: 0,
-    totalPayable: 0,
-    totalReceivable: 0,
-    createdAt: ''
-  };
-
-  return transactions.reduce((acc, transaction) => {
-    const { amount, type } = transaction;
-    
-    switch (type) {
-      case "income":
-        acc.balance += amount;
-        acc.totalIncome += amount;
-        break;
-
-      case "expense":
-        acc.balance -= amount;
-        acc.totalExpense += amount;
-        break;
-
-      case "payable":
-        acc.balance += amount; // Borrowing increases balance
-        acc.totalPayable += amount;
-        break;
-
-      case "receivable":
-        acc.balance -= amount; // Lending decreases balance
-        acc.totalReceivable += amount;
-        break;
-    }
-
-    return acc;
-  }, initialData);
-};
-
 export const calculateNewBalances = (
   currentData: UserData,
   amount: number,
@@ -76,16 +35,19 @@ export const calculateNewBalances = (
       if (amount > relatedData.amount) {
         throw new Error('Settlement amount cannot exceed borrowed amount');
       }
-      // Settling a payable: decrease payables but don't increase expenses
+      // Settling a payable: decrease payables and decrease balance
       newData.totalPayable = Math.max(0, newData.totalPayable - amount);
       newData.balance -= amount; // Paying back borrowed money reduces balance
     } else if (relatedData.type === "receivable") {
       if (amount > relatedData.amount) {
         throw new Error('Settlement amount cannot exceed lent amount');
       }
-      // Settling a receivable: decrease receivables but don't increase income
+      // Settling a receivable: decrease receivables and increase balance
+      newData.balance += amount; // Getting back lent money increases balance
+      // Update total receivable by subtracting the settlement amount
       newData.totalReceivable = Math.max(0, newData.totalReceivable - amount);
-      newData.balance += amount; // Receiving lent money increases balance
+      // Add this as income since we're receiving money
+      newData.totalIncome += amount;
     }
   } else {
     // Validate transaction type
